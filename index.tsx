@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { defineRwpPlugin } from '../../src/lib/plugin-api';
+import { defineRwpPlugin, type RwpRouteProps } from '../../src/lib/plugin-api';
+import { commerceShortcodes, useProductView } from './components/shortcodes';
+import { addSlotContent } from '../../src/core/HookSlot';
+import DashboardCard from '../../src/components/auth/DashboardCard';
+import type { AccountPageChoice } from '../../src/lib/account';
 import manifest from './manifest.json';
 import ShopAdmin from './admin/ShopAdmin';
 import { ShopDashboardWidget } from './admin/ReportsAdmin';
@@ -19,10 +23,18 @@ import { withShopLayout } from './builder/ShopLayoutRoute';
 import type { CatalogProduct } from './lib/types';
 import styles from './public/shop.module.css';
 
+const ProductLayout = withShopLayout('product', ProductPage);
+
+/** Product pages count a view (core's rwp_record_view) whichever screen or template draws them. */
+function ProductRoute(props: RwpRouteProps) {
+  useProductView(props.params.slug);
+  return <ProductLayout {...props} />;
+}
+
 const ShopRoutes = {
   shop: withShopLayout('shop', ShopPage),
   archive: withShopLayout('product_category', ShopPage),
-  product: withShopLayout('product', ProductPage),
+  product: ProductRoute,
   cart: withShopLayout('cart', CartPage),
   checkout: withShopLayout('checkout', CheckoutPage),
   account: withShopLayout('my_account', AccountPage),
@@ -68,7 +80,7 @@ function AddToCartShortcode({ attributes }: { attributes: Record<string, string>
   );
 }
 
-export const shopPluginCleanup = defineRwpPlugin(manifest, ({ admin, routes, header, shortcodes, actions }) => {
+export const shopPluginCleanup = defineRwpPlugin(manifest, ({ admin, routes, header, shortcodes, actions, filters }) => {
   const cleanups = [
     admin.registerPage({
       id: 'rwp-shop', label: 'Shop', icon: '🛒', capability: 'manage_shop', component: ShopAdmin,
@@ -79,7 +91,12 @@ export const shopPluginCleanup = defineRwpPlugin(manifest, ({ admin, routes, hea
         { id: 'customers', label: 'Customers', icon: '🧑‍🤝‍🧑' },
         { id: 'coupons', label: 'Coupons', icon: '🎟️' },
         { id: 'reviews', label: 'Reviews', icon: '⭐' },
+        { id: 'offers', label: 'Offers', icon: '🤝' },
+        { id: 'questions', label: 'Questions', icon: '❓' },
+        { id: 'alerts', label: 'Price alerts', icon: '🔔' },
+        { id: 'bundles', label: 'Bundles', icon: '🧺' },
         { id: 'settings', label: 'Settings', icon: '⚙️' },
+        { id: 'backup', label: 'Backup', icon: '💾' },
       ],
     }),
     admin.registerDashboardWidget({ id: 'rwp-shop-summary', title: '🛒 Shop at a glance', capability: 'manage_shop', component: ShopDashboardWidget }),
@@ -125,12 +142,24 @@ export const shopPluginCleanup = defineRwpPlugin(manifest, ({ admin, routes, hea
         { name: 'quantity', description: 'How many to add. Default 1.' },
       ],
     }),
+    // [rwp_product_qa], [rwp_make_offer], [rwp_price_alert], [rwp_frequently_bought].
+    ...commerceShortcodes.map((shortcode) => shortcodes.register(shortcode)),
     shortcodes.register({
       name: 'rwp_cart_link',
       render: () => <CartHeaderLink />,
       description: 'A link to the cart with the number of items in it.',
       example: '[rwp_cart_link]',
     }),
+
+    // Settings → Site / Accounts can send /dashboard or /profile to My Account instead.
+    filters.add<AccountPageChoice[]>('rwp_account_page_choices', (choices, key) => {
+      if (key === 'dashboard') return [...choices, { label: 'Shop → My Account', url: '/my-account' }];
+      if (key === 'profile') return [...choices, { label: 'Shop → My Account → Account details', url: '/my-account/edit-account' }];
+      return choices;
+    }),
+    addSlotContent('user_dashboard', 'rwp-shop-orders', () => (
+      <DashboardCard href="/my-account/orders" title="Orders" text="Your orders, downloads and addresses." />
+    )),
 
     // Carry a saved cart across devices once the customer signs in.
     actions.add('rwp_user_logged_in', () => { void cart.restoreFromAccount(); }),

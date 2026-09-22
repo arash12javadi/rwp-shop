@@ -1,4 +1,6 @@
 import type { RwpAdminPageProps } from '../../../src/lib/plugin-api';
+import BackupAdmin from './BackupAdmin';
+import CommerceAdmin from './CommerceAdmin';
 import CouponsAdmin from './CouponsAdmin';
 import { CustomersAdmin, ReviewsAdmin } from './CustomersReviewsAdmin';
 import OrdersAdmin from './OrdersAdmin';
@@ -17,6 +19,9 @@ export default function ShopAdmin({ subsection }: RwpAdminPageProps) {
             : subsection === 'coupons' ? <CouponsAdmin />
               : subsection === 'reviews' ? <ReviewsAdmin />
                 : subsection === 'settings' ? <SettingsAdmin />
+                  : subsection === 'backup' ? <BackupAdmin />
+                  : subsection === 'offers' || subsection === 'questions' || subsection === 'alerts' || subsection === 'bundles'
+                    ? <CommerceAdmin section={subsection} />
                   : <OrdersAdmin />}
     </div>
   );
